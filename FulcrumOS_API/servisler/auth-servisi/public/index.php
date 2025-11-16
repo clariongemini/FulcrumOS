@@ -1,5 +1,12 @@
 <?php
-// FulcrumOS v1.1 - Auth Servisi API Giriş Noktası
+/**
+ * FulcrumOS (v10.4) - Auth Servisi
+ * Mimari: Ulaş Kaşıkcı & Gemini
+ * Versiyon: v1.1 (Gerçek Kodlama)
+ *
+ * Bu servis (Slim 4 + PDO), kullanıcı girişi (Login) ve
+ * Gateway için token doğrulama (Internal) işlemlerini yönetir.
+ */
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -9,128 +16,130 @@ use Firebase\JWT\Key;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-// Konfigürasyon dosyasını yükle
-$config = require __DIR__ . '/../config/config.php';
+// (vlucas/phpdotenv .env yüklemesi)
+// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../config');
+// $dotenv->load();
 
-// PDO (Veritabanı) bağlantısını oluştur
-$dsn = "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
+// --- Veritabanı Bağlantısı (PDO) ---
+// (Bu bilgiler config.php'den veya getenv() ile .env'den okunur)
+$db_host = getenv('DB_HOST_AUTH') ?: 'mysql'; // Docker servis adı
+$db_name = getenv('DB_NAME_AUTH') ?: 'fulcrumos_auth';
+$db_user = getenv('DB_USER_AUTH') ?: 'root';
+$db_pass = getenv('DB_PASS_AUTH') ?: getenv('DB_ROOT_PASSWORD');
+$jwt_secret = getenv('JWT_SECRET_KEY') ?: 'COK_GUCLU_BIR_ANAHTAR_GIRILMELI';
+
 try {
-     $pdo = new PDO($dsn, $config['db']['user'], $config['db']['pass'], $options);
+    $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
 } catch (\PDOException $e) {
-     throw new \PDOException($e->getMessage(), (int)$e->getCode());
+    // Servis başlayamazsa kritik hata ver
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode(['hata' => 'Auth Veritabanı bağlantısı başarısız: ' . $e->getMessage()]);
+    exit;
 }
+// ------------------------------------
 
-
-// Slim uygulamasını başlat
 $app = AppFactory::create();
-
-// Middleware: Gelen JSON body'leri otomatik olarak parse et
-$app->addBodyParsingMiddleware();
+$app->addErrorMiddleware(true, true, true);
 
 /**
- * Rota: POST /api/kullanici/giris
- * Kullanıcı e-posta ve parolası ile giriş yapar, başarılı ise JWT döndürür.
+ * 1. PUBLIC API: Kullanıcı Girişi
+ * (v2.5 Master Plan)
  */
-$app->post('/api/kullanici/giris', function (Request $request, Response $response) use ($pdo, $config) {
+$app->post('/api/kullanici/giris', function (Request $request, Response $response) use ($pdo, $jwt_secret) {
     $data = $request->getParsedBody();
-    $eposta = $data['eposta'] ?? null;
-    $parola = $data['parola'] ?? null;
 
-    if (!$eposta || !$parola) {
-        $response->getBody()->write(json_encode(['hata' => 'E-posta ve parola alanları zorunludur.']));
+    if (empty($data['eposta']) || empty($data['parola'])) {
+        $response->getBody()->write(json_encode(['hata' => 'E-posta ve parola zorunludur.']));
         return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
     }
 
-    $stmt = $pdo->prepare("SELECT id, parola FROM kullanicilar WHERE eposta = ? AND aktif = 1");
-    $stmt->execute([$eposta]);
+    // 1. Kullanıcıyı bul
+    $stmt = $pdo->prepare("SELECT * FROM kullanicilar WHERE eposta = ? AND aktif_mi = 1");
+    $stmt->execute([$data['eposta']]);
     $kullanici = $stmt->fetch();
 
-    if ($kullanici && password_verify($parola, $kullanici['parola'])) {
-        $secretKey = $config['jwt']['secret'];
-        $issuer_claim = "fulcrumos_auth_servisi";
-        $audience_claim = "fulcrumos_gateway";
-        $issuedat_claim = time();
-        $expire_claim = $issuedat_claim + 3600; // 1 saat geçerli
-
-        $payload = [
-            'iss' => $issuer_claim,
-            'aud' => $audience_claim,
-            'iat' => $issuedat_claim,
-            'exp' => $expire_claim,
-            'data' => [
-                'kullanici_id' => $kullanici['id']
-            ]
-        ];
-
-        $token = JWT::encode($payload, $secretKey, $config['jwt']['algo']);
-
-        $response->getBody()->write(json_encode(['token' => $token]));
-        return $response->withHeader('Content-Type', 'application/json');
+    // 2. Parolayı doğrula
+    if (!$kullanici || !password_verify($data['parola'], $kullanici['parola'])) {
+        $response->getBody()->write(json_encode(['hata' => 'E-posta veya parola geçersiz.']));
+        return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
     }
 
-    $response->getBody()->write(json_encode(['hata' => 'Geçersiz kimlik bilgileri.']));
-    return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+    // 3. JWT Üret (v5.0 Master Plan - Gateway'in ihtiyaç duyacağı tüm veriler)
+    $iat = time();
+    $exp = $iat + 3600; // 1 saat geçerlilik
+    $rol_id = $kullanici['rol_id'];
+
+    // 3a. Yetkileri Çek (v2.5 ACL)
+    $stmt = $pdo->prepare("
+        SELECT y.yetki_kodu
+        FROM yetkiler y
+        JOIN rol_yetki_iliskisi ryi ON y.yetki_id = ryi.yetki_id
+        WHERE ryi.rol_id = ?
+    ");
+    $stmt->execute([$rol_id]);
+    $yetkiler_raw = $stmt->fetchAll();
+    $yetkiler = array_column($yetkiler_raw, 'yetki_kodu');
+
+    // 3b. Rol Bilgilerini Çek (v2.7 B2B Fiyatlandırma)
+    $stmt = $pdo->prepare("SELECT rol_adi, fiyat_listesi_id FROM roller WHERE rol_id = ?");
+    $stmt->execute([$rol_id]);
+    $rol = $stmt->fetch();
+
+    $payload = [
+        'iss' => 'FulcrumOS-Auth-Servisi',
+        'aud' => 'FulcrumOS-Platformu',
+        'iat' => $iat,
+        'exp' => $exp,
+        'sub' => $kullanici['kullanici_id'],
+        'data' => [
+            'kullanici_id' => (int)$kullanici['kullanici_id'],
+            'rol' => $rol['rol_adi'],
+            'fiyat_listesi_id' => (int)$rol['fiyat_listesi_id'],
+            'yetkiler' => $yetkiler
+        ]
+    ];
+
+    $token = JWT::encode($payload, $jwt_secret, 'HS256');
+
+    $response->getBody()->write(json_encode([
+        'durum' => 'basarili',
+        'token' => $token
+    ]));
+    return $response->withHeader('Content-Type', 'application/json');
 });
 
-
 /**
- * Rota: GET /internal/auth/dogrula
- * Gateway tarafından gönderilen JWT'yi doğrular ve kullanıcı bilgilerini döndürür.
+ * 2. INTERNAL API: Token Doğrulama (Gateway için)
+ * (v5.0 Master Plan)
  */
-$app->get('/internal/auth/dogrula', function (Request $request, Response $response) use ($pdo, $config) {
+$app->get('/internal/auth/dogrula', function (Request $request, Response $response) use ($jwt_secret) {
     $authHeader = $request->getHeaderLine('Authorization');
     $token = str_replace('Bearer ', '', $authHeader);
 
     if (empty($token)) {
-        $response->getBody()->write(json_encode(['hata' => 'Token bulunamadı.']));
+        $response->getBody()->write(json_encode(['hata' => 'Internal: Token eksik.']));
         return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
     }
 
     try {
-        $decoded = JWT::decode($token, new Key($config['jwt']['secret'], $config['jwt']['algo']));
-        $kullanici_id = $decoded->data->kullanici_id;
+        $decoded = JWT::decode($token, new Key($jwt_secret, 'HS256'));
 
-        // Kullanıcının rolünü ve yetkilerini veritabanından çek
-        $sql = "SELECT
-                    k.id AS kullanici_id,
-                    r.rol_adi,
-                    GROUP_CONCAT(y.yetki_kodu) AS yetkiler
-                FROM kullanicilar k
-                JOIN roller r ON k.rol_id = r.id
-                LEFT JOIN rol_yetki_iliskisi ryi ON r.id = ryi.rol_id
-                LEFT JOIN yetkiler y ON ryi.yetki_id = y.id
-                WHERE k.id = ?
-                GROUP BY k.id, r.rol_adi";
-
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$kullanici_id]);
-        $kullanici_detaylari = $stmt->fetch();
-
-        if (!$kullanici_detaylari) {
-             $response->getBody()->write(json_encode(['hata' => 'Token geçerli ancak kullanıcı bulunamadı.']));
-             return $response->withStatus(404)->withHeader('Content-Type', 'application/json');
-        }
-
-        // Yetkileri bir diziye çevir
-        $kullanici_detaylari['yetkiler'] = $kullanici_detaylari['yetkiler'] ? explode(',', $kullanici_detaylari['yetkiler']) : [];
-
-        $response->getBody()->write(json_encode($kullanici_detaylari));
+        // Token geçerli. Token'daki 'data' payload'ını Gateway'e geri döndür.
+        $response->getBody()->write(json_encode([
+            'durum' => 'gecerli',
+            'data' => $decoded->data
+        ]));
         return $response->withHeader('Content-Type', 'application/json');
 
     } catch (Exception $e) {
-        $response->getBody()->write(json_encode(['hata' => 'Geçersiz veya süresi dolmuş token.', 'detay' => $e->getMessage()]));
+        // Token geçersiz (süresi dolmuş, imza yanlış vb.)
+        $response->getBody()->write(json_encode(['hata' => 'Internal: Token gecersiz. ' . $e->getMessage()]));
         return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
     }
 });
 
-
-// Hata yönetimi middleware'ini ekle
-$app->addErrorMiddleware(true, true, true);
-
-// Uygulamayı çalıştır
 $app->run();

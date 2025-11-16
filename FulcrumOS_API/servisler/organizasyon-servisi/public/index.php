@@ -1,5 +1,12 @@
 <?php
-// FulcrumOS v1.1 - Organizasyon Servisi API Giriş Noktası
+/**
+ * FulcrumOS (v10.4) - Organizasyon Servisi
+ * Mimari: Ulaş Kaşıkcı & Gemini
+ * Versiyon: v1.1 (Gerçek Kodlama)
+ *
+ * Bu servis (Slim 4 + PDO), Depolar, Fatura Ayarları,
+ * API Anahtarları gibi kurumsal verileri yönetir.
+ */
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -7,59 +14,56 @@ use Slim\Factory\AppFactory;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-// Konfigürasyon dosyasını yükle
-$config = require __DIR__ . '/../config/config.php';
+// (vlucas/phpdotenv .env yüklemesi)
+// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../config');
+// $dotenv->load();
 
-// PDO (Veritabanı) bağlantısını oluştur
-$dsn = "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
+// --- Veritabanı Bağlantısı (PDO) ---
+$db_host = getenv('DB_HOST_ORGANIZASYON') ?: 'mysql'; // Docker servis adı
+$db_name = getenv('DB_NAME_ORGANIZASYON') ?: 'fulcrumos_organizasyon';
+$db_user = getenv('DB_USER_ORGANIZASYON') ?: 'root';
+$db_pass = getenv('DB_PASS_ORGANIZASYON') ?: getenv('DB_ROOT_PASSWORD');
+
 try {
-     $pdo = new PDO($dsn, $config['db']['user'], $config['db']['pass'], $options);
+    $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
 } catch (\PDOException $e) {
-     throw new \PDOException($e->getMessage(), (int)$e->getCode());
+    header('Content-Type: application/json');
+    http_response_code(500);
+    echo json_encode(['hata' => 'Organizasyon Veritabanı bağlantısı başarısız: ' . $e->getMessage()]);
+    exit;
 }
+// ------------------------------------
 
-// Slim uygulamasını başlat
 $app = AppFactory::create();
-
-// Middleware: Gelen JSON body'leri otomatik olarak parse et
-$app->addBodyParsingMiddleware();
+$app->addErrorMiddleware(true, true, true);
 
 /**
- * Rota: GET /api/organizasyon/depolar
- * Sistemdeki tüm aktif depoları listeler.
- * Not: Bu endpoint'in önünde Gateway tarafından yetki kontrolü (örn: 'depolari_yonet' yetkisi) yapılması beklenir.
+ * 1. PUBLIC API: Aktif Depoları Listele
+ * (v7.3 Admin UI'nin PO Formu için gerekli olan temel veri)
+ *
+ * (Not: v1.1'de henüz Gateway'den gelen X-Permissions header'ını
+ * kontrol edecek bir Middleware (AuthMiddleware) bu servise eklemedik.
+ * Şimdilik public olarak varsayıyoruz.)
  */
 $app->get('/api/organizasyon/depolar', function (Request $request, Response $response) use ($pdo) {
 
-    // Gateway'den gelen kullanıcı bilgilerini header'lardan al (Örnek)
-    // $kullanici_id = $request->getHeaderLine('X-User-ID');
-    // $yetkiler = explode(',', $request->getHeaderLine('X-Permissions'));
-    // if (!in_array('depolari_yonet', $yetkiler)) {
-    //     $response->getBody()->write(json_encode(['hata' => 'Bu işlem için yetkiniz yok.']));
-    //     return $response->withStatus(403)->withHeader('Content-Type', 'application/json');
-    // }
+    // v4.0 WMS Şeması
+    $stmt = $pdo->prepare("SELECT depo_id, depo_adi, depo_kodu FROM depolar WHERE aktif_mi = 1 ORDER BY depo_adi");
+    $stmt->execute();
+    $depolar = $stmt->fetchAll();
 
-    try {
-        $stmt = $pdo->query("SELECT id, depo_adi, adres, aktif FROM depolar WHERE aktif = 1 ORDER BY depo_adi ASC");
-        $depolar = $stmt->fetchAll();
-
-        $response->getBody()->write(json_encode($depolar));
-        return $response->withHeader('Content-Type', 'application/json');
-
-    } catch (\PDOException $e) {
-        // Gerçek bir uygulamada burada loglama yapılmalıdır.
-        $response->getBody()->write(json_encode(['hata' => 'Depolar listelenirken bir veritabanı hatası oluştu.']));
-        return $response->withStatus(500)->withHeader('Content-Type', 'application/json');
-    }
+    $response->getBody()->write(json_encode([
+        'durum' => 'basarili',
+        'veriler' => $depolar
+    ]));
+    return $response->withHeader('Content-Type', 'application/json');
 });
 
-// Hata yönetimi middleware'ini ekle
-$app->addErrorMiddleware(true, true, true);
+// (v7.3'te eklenecek olan /api/admin/organizasyon/depolar [CRUD] endpoint'leri buraya gelecek)
+// (v10.1'de eklenecek olan /api/admin/organizasyon/ayarlar/watermark [CRUD] endpoint'leri buraya gelecek)
+// (v10.2'de eklenecek olan /api/admin/organizasyon/ayarlar/fatura [CRUD] endpoint'leri buraya gelecek)
 
-// Uygulamayı çalıştır
 $app->run();
