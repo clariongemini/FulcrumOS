@@ -1,0 +1,266 @@
+version: '3.8'
+
+services:
+  # Gateway Servisi
+  gateway-servisi:
+    build:
+      context: ./servisler/gateway-servisi
+    container_name: fulcrum_gateway_servisi
+    ports:
+      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+    volumes:
+      - ./servisler/gateway-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  # Backend Servisleri
+  auth-servisi:
+    build:
+      context: ./servisler/auth-servisi
+    container_name: fulcrum_auth_servisi
+    volumes:
+      - ./servisler/auth-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  katalog-servisi:
+    build:
+      context: ./servisler/katalog-servisi
+    container_name: fulcrum_katalog_servisi
+    volumes:
+      - ./servisler/katalog-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  envanter-servisi:
+    build:
+      context: ./servisler/envanter-servisi
+    container_name: fulcrum_envanter_servisi
+    volumes:
+      - ./servisler/envanter-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  siparis-servisi:
+    build:
+      context: ./servisler/siparis-servisi
+    container_name: fulcrum_siparis_servisi
+    volumes:
+      - ./servisler/siparis-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  iade-servisi:
+    build:
+      context: ./servisler/iade-servisi
+    container_name: fulcrum_iade_servisi
+    volumes:
+      - ./servisler/iade-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  tedarik-servisi:
+    build:
+      context: ./servisler/tedarik-servisi
+    container_name: fulcrum_tedarik_servisi
+    volumes:
+      - ./servisler/tedarik-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  raporlama-servisi:
+    build:
+      context: ./servisler/raporlama-servisi
+    container_name: fulcrum_raporlama_servisi
+    volumes:
+      - ./servisler/raporlama-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  bildirim-servisi:
+    build:
+      context: ./servisler/bildirim-servisi
+    container_name: fulcrum_bildirim_servisi
+    volumes:
+      - ./servisler/bildirim-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  cms-servisi:
+    build:
+      context: ./servisler/cms-servisi
+    container_name: fulcrum_cms_servisi
+    volumes:
+      - ./servisler/cms-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  destek-servisi:
+    build:
+      context: ./servisler/destek-servisi
+    container_name: fulcrum_destek_servisi
+    volumes:
+      - ./servisler/destek-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  otomasyon-servisi:
+    build:
+      context: ./servisler/otomasyon-servisi
+    container_name: fulcrum_otomasyon_servisi
+    volumes:
+      - ./servisler/otomasyon-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  kupon-servisi:
+    build:
+      context: ./servisler/kupon-servisi
+    container_name: fulcrum_kupon_servisi
+    volumes:
+      - ./servisler/kupon-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  medya-servisi:
+    build:
+      context: ./servisler/medya-servisi
+    container_name: fulcrum_medya_servisi
+    volumes:
+      - ./servisler/medya-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  ai-asistan-servisi:
+    build:
+      context: ./servisler/ai-asistan-servisi
+    container_name: fulcrum_ai_asistan_servisi
+    volumes:
+      - ./servisler/ai-asistan-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  entegrasyon-servisi:
+    build:
+      context: ./servisler/entegrasyon-servisi
+    container_name: fulcrum_entegrasyon_servisi
+    volumes:
+      - ./servisler/entegrasyon-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  organizasyon-servisi:
+    build:
+      context: ./servisler/organizasyon-servisi
+    container_name: fulcrum_organizasyon_servisi
+    volumes:
+      - ./servisler/organizasyon-servisi:/var/www/html
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - RABBITMQ_HOST=rabbitmq
+
+  # Frontend Servisi
+  admin-ui:
+    build:
+      context: ./servisler/admin-ui
+    container_name: fulcrum_admin_ui
+    ports:
+      - "${ADMIN_UI_PORT}:${ADMIN_UI_PORT}"
+    volumes:
+      - ./servisler/admin-ui:/app
+
+  # Veritabanı Servisi
+  mysql:
+    image: mysql:8.0
+    container_name: fulcrum_mysql
+    ports:
+      - "${DB_PORT}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - fulcrum_db_data:/var/lib/mysql
+
+  # Mesaj Kuyruğu Servisi
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: fulcrum_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - fulcrum_rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  fulcrum_db_data:
+  fulcrum_rabbitmq_data:
