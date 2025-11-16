@@ -1,0 +1,17 @@
+{
+    "name": "fulcrumos/gateway-servisi",
+    "description": "FulcrumOS için tüm API isteklerini karşılayan ve yönlendiren ana giriş kapısı.",
+    "type": "project",
+    "require": {
+        "php": "^8.1",
+        "slim/slim": "4.*",
+        "slim/psr7": "^1.6",
+        "guzzlehttp/guzzle": "^7.5",
+        "vlucas/phpdotenv": "^5.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}
