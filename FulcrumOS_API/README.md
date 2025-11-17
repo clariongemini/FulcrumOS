@@ -6,9 +6,9 @@ FulcrumOS, "1P (Fenerium Modeli) + AI Asistanı" vizyonuyla geliştirilen, başs
 
 Bu depo, FulcrumOS platformunun tüm backend servislerini ve `admin-ui` frontend servisini içeren ana API monoreposudur.
 
-## Mevcut Durum: v1.1 (Çekirdek Servislerin Nihai İnşası)
+## Mevcut Durum: v1.2 (Katalog Servisi İnşası)
 
-Bu versiyon, projenin "Fiziksel İnşa Aşaması"nın ikinci adımını tamamlamaktadır. v1.0'da oluşturulan boş iskeletin üzerine, sistemin çalışması için en kritik olan 3 çekirdek servisin **nihai ve fonksiyonel kod temelleri** atılmıştır.
+Bu versiyon, projenin "motor" parçalarından ilki olan **Katalog Servisi**'nin temelini atarak v1.1'in üzerine inşa edilmiştir. Ürün yönetimi için gerekli veritabanı şeması ve temel CRUD (Create, Read, Update, Delete) API'ları tamamlanmıştır.
 
 ### İnşa Edilen Servisler ve Mimarideki Rolleri
 

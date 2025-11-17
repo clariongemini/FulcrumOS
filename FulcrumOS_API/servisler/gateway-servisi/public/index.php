@@ -100,7 +100,7 @@ $routing_map = [
     '/api/kullanici/giris' => 'http://auth-servisi',
     // Organizasyon (v1.1)
     '/api/organizasyon/depolar' => 'http://organizasyon-servisi',
-    // Katalog (Gelecek v1.2)
+    // Katalog (v1.2)
     '/api/admin/urunler' => 'http://katalog-servisi',
     // Sipariş (Gelecek v1.x)
     '/api/admin/siparisler' => 'http://siparis-servisi',
