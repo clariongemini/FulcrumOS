@@ -1,0 +1,262 @@
+version: '3.8'
+
+# -----------------------------------------------------------------------------
+#  FulcrumOS (v10.4) - Ana Orkestrasyon Dosyası
+#  Mimari: Ulaş Kaşıkcı & Gemini
+#  'docker-compose up -d' komutu ile tüm platformu başlatır.
+# -----------------------------------------------------------------------------
+
+networks:
+  fulcrumos_agi:
+    driver: bridge
+
+volumes:
+  fulcrumos_mysql_data:
+  fulcrumos_rabbitmq_data:
+
+services:
+
+  # 1. ALTYAPI: Veritabanı
+  mysql:
+    image: mysql:8.0
+    container_name: fulcrumos_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    ports:
+      - "${DB_PORT}:3306"
+    volumes:
+      - fulcrumos_mysql_data:/var/lib/mysql
+      # v9.1 Planı: Başlangıçta 16+ servisin veritabanını ve demo verisini yükler
+      - ./setup/sql/:/docker-entrypoint-initdb.d
+    networks:
+      - fulcrumos_agi
+
+  # 2. ALTYAPI: Message Broker
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: fulcrumos_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_UI_PORT}:15672" # Admin Arayüzü
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    volumes:
+      - fulcrumos_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - fulcrumos_agi
+
+  # 3. KOKPİT (FRONTEND): Admin UI
+  admin-ui:
+    build:
+      context: ./servisler/admin-ui
+    container_name: fulcrumos_admin_ui
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_UI_PORT}:80" # Nginx (Alpine) 80 portunda çalışır
+    depends_on:
+      - gateway-servisi
+    networks:
+      - fulcrumos_agi
+
+  # 4. ÇEKİRDEK: API Gateway
+  gateway-servisi:
+    build:
+      context: ./servisler/gateway-servisi
+    container_name: fulcrumos_gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT}:80"
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - auth-servisi
+      - katalog-servisi
+      - siparis-servisi
+      # (ve diğer 13 backend servisi)
+
+  # 5. ÇEKİRDEK: Auth Servisi
+  auth-servisi:
+    build:
+      context: ./servisler/auth-servisi
+    container_name: fulcrumos_auth
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+
+  # 6. ÇEKİRDEK: Organizasyon Servisi
+  organizasyon-servisi:
+    build:
+      context: ./servisler/organizasyon-servisi
+    container_name: fulcrumos_organizasyon
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+
+  # 7. MOTOR: Katalog Servisi
+  katalog-servisi:
+    build:
+      context: ./servisler/katalog-servisi
+    container_name: fulcrumos_katalog
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+
+  # 8. MOTOR: Envanter Servisi (Worker)
+  envanter-servisi:
+    build:
+      context: ./servisler/envanter-servisi
+    container_name: fulcrumos_envanter
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  # 9. MOTOR: Sipariş Servisi
+  siparis-servisi:
+    build:
+      context: ./servisler/siparis-servisi
+    container_name: fulcrumos_siparis
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  # 10. MOTOR: İade Servisi
+  iade-servisi:
+    build:
+      context: ./servisler/iade-servisi
+    container_name: fulcrumos_iade
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  # 11. MOTOR: Tedarik Servisi
+  tedarik-servisi:
+    build:
+      context: ./servisler/tedarik-servisi
+    container_name: fulcrumos_tedarik
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  # 12. DESTEK: Raporlama Servisi
+  raporlama-servisi:
+    build:
+      context: ./servisler/raporlama-servisi
+    container_name: fulcrumos_raporlama
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  # 13. DESTEK: Bildirim Servisi (Worker)
+  bildirim-servisi:
+    build:
+      context: ./servisler/bildirim-servisi
+    container_name: fulcrumos_bildirim
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - rabbitmq
+
+  # 14. DESTEK: CMS Servisi
+  cms-servisi:
+    build:
+      context: ./servisler/cms-servisi
+    container_name: fulcrumos_cms
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+
+  # 15. DESTEK: Destek Servisi
+  destek-servisi:
+    build:
+      context: ./servisler/destek-servisi
+    container_name: fulcrumos_destek
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+
+  # 16. DESTEK: Otomasyon Servisi
+  otomasyon-servisi:
+    build:
+      context: ./servisler/otomasyon-servisi
+    container_name: fulcrumos_otomasyon
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+
+  # 17. DESTEK: Kupon Servisi
+  kupon-servisi:
+    build:
+      context: ./servisler/kupon-servisi
+    container_name: fulcrumos_kupon
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  # 18. DESTEK: Medya Servisi
+  medya-servisi:
+    build:
+      context: ./servisler/medya-servisi
+    container_name: fulcrumos_medya
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+
+  # 19. AI: AI Asistan Servisi
+  ai-asistan-servisi:
+    build:
+      context: ./servisler/ai-asistan-servisi
+    container_name: fulcrumos_ai_asistan
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+      - rabbitmq
+
+  # 20. AI: Entegrasyon Servisi
+  entegrasyon-servisi:
+    build:
+      context: ./servisler/entegrasyon-servisi
+    container_name: fulcrumos_entegrasyon
+    restart: unless-stopped
+    networks:
+      - fulcrumos_agi
+    depends_on:
+      - mysql
+      - rabbitmq
