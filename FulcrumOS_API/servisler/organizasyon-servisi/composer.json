@@ -1,0 +1,16 @@
+{
+    "name": "fulcrumos/organizasyon-servisi",
+    "description": "FulcrumOS için depo, entegrasyon ve fatura ayarlarını yöneten servis.",
+    "type": "project",
+    "require": {
+        "php": "^8.1",
+        "slim/slim": "4.*",
+        "slim/psr7": "^1.6",
+        "vlucas/phpdotenv": "^5.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}
